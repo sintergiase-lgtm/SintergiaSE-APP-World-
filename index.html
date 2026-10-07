@@ -511,30 +511,6 @@
   });
 })();
 </script>
-<!-- SINTERGIA / SUPABASE GITHUB PAGES BRIDGE v2 -->
-<script id="sintergia-supabase-github-bridge-v2">
-(function(){
-  'use strict';
-  var BASE='https://bgjicsowspppsjzigazb.supabase.co';
-  window.SUPABASE_URL=BASE;
-  window.SINTERGIA_API_BASE=BASE;
-  var nativeFetch=window.fetch.bind(window);
-  function rewrite(input){
-    try{
-      var raw=typeof input==='string'?input:(input&&input.url);
-      if(!raw)return input;
-      var u=new URL(raw,location.href);
-      if(u.origin===location.origin && /^\/functions\/v1\//.test(u.pathname)){
-        var target=BASE+u.pathname+u.search;
-        if(typeof input==='string')return target;
-        return new Request(target,input);
-      }
-    }catch(_){}
-    return input;
-  }
-  window.fetch=function(input,init){return nativeFetch(rewrite(input),init);};
-})();
-</script>
 <!-- SINTERGIA / LOVABLE CONFIG: secretos solo en backend/Edge Functions -->
 <script>
 window.SINTERGIA_LOVABLE = Object.freeze({
@@ -570,7 +546,7 @@ window.SINTERGIA_LOVABLE = Object.freeze({
     healthEndpoint: '/functions/v1/health',
     enabled: true
   },
-  supabase: { url: 'https://bgjicsowspppsjzigazb.supabase.co' }
+  supabase: { url: window.SUPABASE_URL || '' }
 });
 </script>
 <!-- =========================================================
@@ -767,7 +743,7 @@ window.SintergiaSecurityConfig = Object.freeze({
     window.__mostrarErrorApp = banner;
     window.addEventListener('error', function (ev) {
         if (ev.target && ev.target !== window && ev.target.tagName) {
-            if (ev.target.tagName === 'SCRIPT') { var _src=String(ev.target.src||''); if (/cdn\.jsdelivr\.net\/npm\/three(?:@0\.128\.0)?\/build\/three\.min\.js/i.test(_src)) return; banner('No se pudo cargar: ' + _src); }
+            if (ev.target.tagName === 'SCRIPT') banner('No se pudo cargar: ' + ev.target.src);
             return;
         }
         banner('Error: ' + ev.message + (ev.lineno ? ' (línea ' + ev.lineno + ')' : ''));
@@ -938,9 +914,9 @@ window.SintergiaSecurityConfig = Object.freeze({
 
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="theme-color" content="#0F2B48">
-    <link rel="manifest" href="./manifest.webmanifest">
-    <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
-    <link rel="apple-touch-icon" href="./apple-touch-icon.png">
+    <link rel="manifest" href="/sintergia/manifest.webmanifest">
+    <link rel="icon" type="image/png" sizes="192x192" href="/sintergia/icon-192.png">
+    <link rel="apple-touch-icon" href="/sintergia/apple-touch-icon.png">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -2678,7 +2654,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 (function(){
  'use strict';
  var cfg=window.SINTERGIA_LOVABLE&&window.SINTERGIA_LOVABLE.observability||{};
- var endpoint=(window.SINTERGIA_API_BASE||'https://bgjicsowspppsjzigazb.supabase.co')+'/functions/v1/health', fallbackEndpoint='/functions/v1/health', timer=null, busy=false, last=null;
+ var endpoint=cfg.healthEndpoint||'/api/public/health', fallbackEndpoint='/functions/v1/health', timer=null, busy=false, last=null;
  function el(id){return document.getElementById(id)}
  function render(ok,detail){var b=el('sintergia-backend-health'),t=el('sintergia-backend-health-text');if(!b||!t)return;last={ok:ok,at:new Date().toISOString(),detail:detail||''};if(ok){b.classList.remove('err');b.classList.add('ok');b.style.display='none';t.textContent='🟢 Backend Lovable operativo';}else{b.classList.remove('ok');b.classList.add('err');b.style.display='flex';t.innerHTML='⚠️ <strong>Backend no disponible.</strong> Las operaciones locales siguen guardadas y se sincronizarán al recuperar conexión. <small>'+String(detail||'Sin respuesta').replace(/[<>]/g,'')+'</small>';}}
  async function ping(manual){if(busy)return false;busy=true;try{if(!navigator.onLine){render(false,'Sin conexión a Internet');return false;}var c=new AbortController(),to=setTimeout(function(){c.abort()},7000);var r=await fetch(endpoint,{method:'GET',cache:'no-store',credentials:'include',signal:c.signal,headers:{'X-Sintergia-Health-Check':'1'}});clearTimeout(to);if(!r.ok && endpoint!==fallbackEndpoint){r=await fetch(fallbackEndpoint,{method:'GET',cache:'no-store',credentials:'include',headers:{'X-Sintergia-Health-Check':'1'}});}if(!r.ok)throw new Error('HTTP '+r.status);var d=await r.json().catch(function(){return null});if(!d||d.ok!==true)throw new Error((d&&d.message)||'health=false o respuesta inválida');render(true,'OK');return true;}catch(e){render(false,e&&e.name==='AbortError'?'Timeout':(e&&e.message||'Sin respuesta'));return false;}finally{busy=false;}}
@@ -4778,7 +4754,7 @@ function play(){
   function verificarServidor(scope, value) {
     return fetch(endpoint(), {
       method: 'POST',
-      headers: Object.assign({ 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }, (window.authHeadersSintergia ? window.authHeadersSintergia() : {})),
+      headers: { 'Content-Type': 'application/json' },
       cache: 'no-store',
       credentials: 'same-origin',
       body: JSON.stringify({ scope: scope, password: String(value == null ? '' : value) })
@@ -16736,11 +16712,9 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
     ['Cita email','POST','/functions/v1/cita-email','mutating'],
     ['Cita WhatsApp','POST','/functions/v1/cita-whatsapp','mutating'],
     ['Cita estado','POST','/functions/v1/cita-estado','safe'],
-    /* Recibos: no se ejecutan en el diagnóstico. Ambos endpoints requieren un recibo/factura real;
-       mandar {} produce 400 por diseño y no demuestra que el endpoint esté roto. */
-    ['Receipt verify','POST','/functions/v1/verify-receipt','real-data'],
-    ['Receipt register','POST','/functions/v1/receipt-register','real-data'],
-    ['Receipt status','POST','/functions/v1/receipt-status','real-data']
+    ['Receipt verify','POST','/functions/v1/verify-receipt','safe'],
+    ['Receipt register','POST','/functions/v1/receipt-register','safe'],
+    ['Receipt status','POST','/functions/v1/receipt-status','safe']
   ];
   function headers(){return (typeof global.authHeadersSintergia==='function')?global.authHeadersSintergia():{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'};}
   function op(){return (typeof global.idOperacion==='function')?global.idOperacion():'SINT-'+Date.now().toString(36);}
@@ -16765,7 +16739,6 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
       else if(kind==='safe') body={};
     }
     if(kind==='mutating') return {name:name,status:'⚪ OMITIDA',cls:'sdiag-na',detail:'No se ejecuta automáticamente porque podría enviar un correo o mensaje real.'};
-    if(kind==='real-data') return {name:name,status:'⚪ NO PROBADA',cls:'sdiag-na',detail:'Requiere datos reales de una operación (recibo/factura). El diagnóstico no envía una petición vacía que provoque un 400 falso.'};
     var ctrl=new AbortController(),timer=setTimeout(function(){ctrl.abort();},15000);
     try{
       var r=await fetch(url,{method:method,headers:h,credentials:'include',cache:'no-store',signal:ctrl.signal,body:method==='POST'?JSON.stringify(body):undefined});
@@ -17622,24 +17595,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
 
 </script>
-<script id="sintergia-pwa-emergency-cleanup-v2">
-(function(){
-  'use strict';
-  // GitHub Pages: elimina Service Workers antiguos que puedan servir una versión
-  // histórica del HTML (incluido el loader Three.js que ya no pertenece a v3_63).
-  if (!('serviceWorker' in navigator) || !window.isSecureContext) return;
-  window.addEventListener('load', function(){
-    try {
-      navigator.serviceWorker.getRegistrations().then(function(rs){
-        rs.forEach(function(r){
-          var u = String(r && r.active && r.active.scriptURL || r && r.installing && r.installing.scriptURL || r && r.waiting && r.waiting.scriptURL || '');
-          if (/\/sw\.js(?:\?|$)/i.test(u)) r.unregister().catch(function(){});
-        });
-      }).catch(function(){});
-    } catch(_) {}
-  }, {once:true});
-})();
-</script>
 <script id="sintergia-pwa-register-v1">
 (function(){
   'use strict';
@@ -17661,14 +17616,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
     return;
   }
   window.addEventListener('load', function(){
-    // No registrar automáticamente un SW ausente en GitHub Pages.
-    // Si el fichero existe, se puede registrar; si no, la app sigue funcionando
-    // sin crear errores ni conservar cachés antiguas.
-    fetch('./sw.js', {method:'HEAD', cache:'no-store'}).then(function(r){
-      if(!r || !r.ok) return null;
-      return navigator.serviceWorker.register('./sw.js', {scope:'./'});
-    }).then(function(reg){
-      if(!reg) return;
+    navigator.serviceWorker.register('./sw.js', {scope:'./'}).then(function(reg){
       window.SintergiaServiceWorkerRegistration=reg;
       if(reg.waiting){ window.dispatchEvent(new CustomEvent('sintergia-sw-update',{detail:{registration:reg}})); }
     }).catch(function(err){
